@@ -54,6 +54,30 @@ interface OrderRowWithTable extends OrderRow {
   tables: { table_number: number; label: string | null } | null;
 }
 
+/** Fetches order_items for the given orders and merges them into `OrderWithItems`. */
+async function attachItems(safeOrders: OrderRowWithTable[], errorLabel: string): Promise<OrderWithItems[]> {
+  if (safeOrders.length === 0) return [];
+
+  const orderIds = safeOrders.map((order) => order.id);
+  const { data: items, error: itemsError } = await supabase
+    .from("order_items")
+    .select("*")
+    .in("order_id", orderIds);
+
+  if (itemsError) {
+    console.error(`${errorLabel} items failed:`, itemsError.message);
+  }
+
+  const safeItems = (items ?? []) as OrderItemRow[];
+
+  return safeOrders.map((order) => ({
+    ...order,
+    table_number: order.tables?.table_number ?? 0,
+    table_label: order.tables?.label ?? null,
+    items: safeItems.filter((item) => item.order_id === order.id),
+  }));
+}
+
 export async function getRecentOrders(limit = 30): Promise<OrderWithItems[]> {
   const { data: orders, error: ordersError } = await supabase
     .from("orders")
@@ -66,27 +90,27 @@ export async function getRecentOrders(limit = 30): Promise<OrderWithItems[]> {
     return [];
   }
 
-  const safeOrders = (orders ?? []) as OrderRowWithTable[];
-  if (safeOrders.length === 0) return [];
+  return attachItems((orders ?? []) as OrderRowWithTable[], "getRecentOrders");
+}
 
-  const orderIds = safeOrders.map((order) => order.id);
-  const { data: items, error: itemsError } = await supabase
-    .from("order_items")
-    .select("*")
-    .in("order_id", orderIds);
+/**
+ * Fetches every order created within `[startIso, endIso)`, oldest first — used by
+ * the staff history view to list/group a day's orders by time slot.
+ */
+export async function getOrdersInRange(startIso: string, endIso: string): Promise<OrderWithItems[]> {
+  const { data: orders, error: ordersError } = await supabase
+    .from("orders")
+    .select("*, tables ( table_number, label )")
+    .gte("created_at", startIso)
+    .lt("created_at", endIso)
+    .order("created_at", { ascending: true });
 
-  if (itemsError) {
-    console.error("getRecentOrders items failed:", itemsError.message);
+  if (ordersError) {
+    console.error("getOrdersInRange failed:", ordersError.message);
+    return [];
   }
 
-  const safeItems = (items ?? []) as OrderItemRow[];
-
-  return safeOrders.map((order) => ({
-    ...order,
-    table_number: order.tables?.table_number ?? 0,
-    table_label: order.tables?.label ?? null,
-    items: safeItems.filter((item) => item.order_id === order.id),
-  }));
+  return attachItems((orders ?? []) as OrderRowWithTable[], "getOrdersInRange");
 }
 
 export async function getOrderWithItems(orderId: string): Promise<OrderWithItems | null> {

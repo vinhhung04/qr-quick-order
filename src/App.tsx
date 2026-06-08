@@ -2,6 +2,7 @@ import { Link, Route, Routes } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import OrderPage from "./pages/OrderPage";
 import StaffOrdersPage from "./pages/StaffOrdersPage";
+import StaffHistoryPage from "./pages/StaffHistoryPage";
 import AdminMenuPage from "./pages/AdminMenuPage";
 import AdminTablesPage from "./pages/AdminTablesPage";
 
@@ -26,6 +27,7 @@ export default function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/order/:qrToken" element={<OrderPage />} />
         <Route path="/staff/orders" element={<StaffOrdersPage />} />
+        <Route path="/staff/history" element={<StaffHistoryPage />} />
         <Route path="/admin/menu" element={<AdminMenuPage />} />
         <Route path="/admin/tables" element={<AdminTablesPage />} />
         <Route path="*" element={<NotFound />} />
@@ -37,6 +39,7 @@ export default function App() {
 function HomePage() {
   const links = [
     { to: "/staff/orders", label: "📋 Màn hình order (nhân viên)", desc: "Xem order mới realtime" },
+    { to: "/staff/history", label: "🗓️ Lịch sử gọi món", desc: "Xem lại order theo ngày & khung giờ" },
     { to: "/admin/menu", label: "🍲 Quản lý menu", desc: "Thêm, sửa, xóa món ăn" },
     { to: "/admin/tables", label: "🪑 Quản lý bàn & QR", desc: "Tạo bàn và lấy mã QR" },
   ];

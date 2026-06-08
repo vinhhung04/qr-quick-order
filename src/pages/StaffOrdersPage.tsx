@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
 import { supabase } from "../lib/supabase";
 import { getOrderWithItems, getRecentOrders } from "../services/orderService";
@@ -118,9 +119,17 @@ export default function StaffOrdersPage() {
             <h1 className="text-2xl font-extrabold text-stone-900">📋 Order realtime</h1>
             <p className="text-sm text-stone-500">Đơn hàng mới sẽ tự động xuất hiện ở đây</p>
           </div>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-bold text-emerald-700">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" /> Đang theo dõi
-          </span>
+          <div className="flex shrink-0 items-center gap-2">
+            <Link
+              to="/staff/history"
+              className="rounded-2xl bg-white px-3.5 py-2 text-xs font-semibold text-stone-600 shadow-sm ring-1 ring-stone-200 transition hover:bg-stone-50"
+            >
+              🗓️ Lịch sử
+            </Link>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-bold text-emerald-700">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" /> Đang theo dõi
+            </span>
+          </div>
         </header>
 
         {!loading && (
