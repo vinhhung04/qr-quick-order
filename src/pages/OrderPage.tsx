@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { CartProvider } from "../context/CartContext";
@@ -22,6 +22,8 @@ import { getTableLabel } from "../lib/utils";
 
 type LoadState = "loading" | "ready" | "not-found" | "error";
 
+const REQUEST_COOLDOWN_MS = 10_000;
+
 export default function OrderPage() {
   const { qrToken } = useParams<{ qrToken: string }>();
 
@@ -44,6 +46,7 @@ function OrderPageContent({ qrToken }: { qrToken: string }) {
   const [submitting, setSubmitting] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
   const [pendingRequests, setPendingRequests] = useState<Set<TableRequestType>>(() => new Set());
+  const submittingRef = useRef(false);
 
   const cart = useCart();
 
@@ -114,7 +117,7 @@ function OrderPageContent({ qrToken }: { qrToken: string }) {
           next.delete(type);
           return next;
         });
-      }, 90_000);
+      }, REQUEST_COOLDOWN_MS);
     } catch (err) {
       console.error(err);
       toast.error("Không thể gửi yêu cầu, vui lòng thử lại.");
@@ -127,7 +130,14 @@ function OrderPageContent({ qrToken }: { qrToken: string }) {
   }
 
   async function handleSubmitOrder() {
+    if (submittingRef.current || submitting) return;
     if (!table) return;
+    if (cart.lines.length === 0) {
+      toast.error("Vui lòng chọn ít nhất một món trước khi gửi order.");
+      return;
+    }
+
+    submittingRef.current = true;
     setSubmitting(true);
     try {
       await createOrder({
@@ -141,6 +151,7 @@ function OrderPageContent({ qrToken }: { qrToken: string }) {
       console.error(err);
       toast.error("Gửi order thất bại, vui lòng thử lại.");
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   }
