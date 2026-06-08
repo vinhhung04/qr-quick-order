@@ -131,12 +131,16 @@ các route phía client (React Router) hoạt động đúng khi reload trang.
 | `tables` | Bàn ăn — số bàn, `qr_token` riêng, trạng thái hoạt động, tên hiển thị tuỳ chọn (`label`, vd. "Phòng lạnh 1") |
 | `categories` | Danh mục món ăn — tên, thứ tự hiển thị |
 | `menu_items` | Món ăn/đồ uống — tên, mô tả, giá, ảnh, còn hàng/bán chạy/mới |
-| `orders` | Đơn hàng — bàn nào đặt, tổng tiền, ghi chú chung |
+| `orders` | Đơn hàng — bàn nào đặt, tổng tiền, ghi chú chung. Được tạo qua RPC `create_order_with_items` (xem ghi chú bên dưới) |
 | `order_items` | Chi tiết đơn — **lưu lại `item_name`/`price` tại thời điểm đặt** để lịch sử order không bị thay đổi khi admin sửa menu sau này |
 | `table_requests` | Yêu cầu nhanh từ khách — gọi nhân viên / yêu cầu thanh toán, hiển thị realtime ở `/staff/orders` |
 
 Chi tiết đầy đủ (kiểu dữ liệu, khóa ngoại, RLS policies) xem trong
 [`supabase/schema.sql`](supabase/schema.sql).
+
+> 🔒 **Order creation uses a Supabase RPC function `create_order_with_items`**
+> so the order and its items are inserted atomically. If inserting items
+> fails, the whole operation is rolled back and no empty order is left behind.
 
 ## 🎨 Ghi chú thiết kế
 

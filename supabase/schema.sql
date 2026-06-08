@@ -95,6 +95,107 @@ create table if not exists public.order_items (
 create index if not exists order_items_order_id_idx on public.order_items (order_id);
 
 -- ----------------------------------------------------------------------------
+-- create_order_with_items: creates an order plus its order_items atomically.
+-- Without this, a customer submitting an order would trigger two separate
+-- inserts from the client (orders, then order_items); if the second one
+-- failed partway through, the database would be left with an "empty" order
+-- (a row in `orders` with no matching `order_items`). Wrapping both inserts
+-- in a single PL/pgSQL function makes them one transaction — either both
+-- succeed and the order_id is returned, or any failure raises an exception
+-- and Postgres rolls back the whole thing, leaving no orphaned order behind.
+-- ----------------------------------------------------------------------------
+create or replace function public.create_order_with_items(
+  p_table_id uuid,
+  p_note text,
+  p_items jsonb
+)
+returns uuid
+language plpgsql
+security invoker
+as $$
+declare
+  v_order_id uuid;
+  v_total_amount numeric(12, 0);
+begin
+  if p_table_id is null then
+    raise exception 'table_id is required';
+  end if;
+
+  if not exists (
+    select 1 from public.tables
+    where id = p_table_id and is_active = true
+  ) then
+    raise exception 'table not found or inactive';
+  end if;
+
+  if p_items is null or jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) = 0 then
+    raise exception 'order items are required';
+  end if;
+
+  if exists (
+    select 1
+    from jsonb_to_recordset(p_items) as item(
+      menu_item_id uuid,
+      item_name text,
+      price numeric,
+      quantity integer,
+      note text
+    )
+    where
+      item_name is null
+      or btrim(item_name) = ''
+      or price is null
+      or price < 0
+      or quantity is null
+      or quantity <= 0
+  ) then
+    raise exception 'invalid order item';
+  end if;
+
+  select coalesce(sum(item.price * item.quantity), 0)
+  into v_total_amount
+  from jsonb_to_recordset(p_items) as item(
+    menu_item_id uuid,
+    item_name text,
+    price numeric,
+    quantity integer,
+    note text
+  );
+
+  insert into public.orders (table_id, total_amount, note)
+  values (p_table_id, v_total_amount, nullif(btrim(coalesce(p_note, '')), ''))
+  returning id into v_order_id;
+
+  insert into public.order_items (
+    order_id,
+    menu_item_id,
+    item_name,
+    price,
+    quantity,
+    note
+  )
+  select
+    v_order_id,
+    item.menu_item_id,
+    item.item_name,
+    item.price,
+    item.quantity,
+    nullif(btrim(coalesce(item.note, '')), '')
+  from jsonb_to_recordset(p_items) as item(
+    menu_item_id uuid,
+    item_name text,
+    price numeric,
+    quantity integer,
+    note text
+  );
+
+  return v_order_id;
+end;
+$$;
+
+grant execute on function public.create_order_with_items(uuid, text, jsonb) to anon;
+
+-- ----------------------------------------------------------------------------
 -- table_requests: lightweight call-staff / request-bill notifications sent
 -- from the customer ordering page and shown live on /staff/orders.
 -- ----------------------------------------------------------------------------

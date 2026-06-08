@@ -10,7 +10,10 @@ export interface CreateOrderInput {
 }
 
 /**
- * Creates an order plus its order_items in two inserts. item_name/price are
+ * Creates an order plus its order_items via the `create_order_with_items` RPC
+ * (see supabase/schema.sql), which inserts both in a single transaction. This
+ * guarantees we never end up with an "empty" order — if inserting the items
+ * fails for any reason, the order row is rolled back too. item_name/price are
  * snapshotted from the cart so later menu edits don't rewrite order history.
  */
 export async function createOrder({ tableId, note, lines }: CreateOrderInput): Promise<string> {
@@ -18,36 +21,24 @@ export async function createOrder({ tableId, note, lines }: CreateOrderInput): P
     throw new Error("Giỏ hàng đang trống.");
   }
 
-  const totalAmount = lines.reduce((sum, line) => sum + line.price * line.quantity, 0);
+  const { data: orderId, error } = await supabase.rpc("create_order_with_items", {
+    p_table_id: tableId,
+    p_note: note || null,
+    p_items: lines.map((line) => ({
+      menu_item_id: line.menuItemId,
+      item_name: line.name,
+      price: line.price,
+      quantity: line.quantity,
+      note: line.note || null,
+    })),
+  });
 
-  const { data: order, error: orderError } = await supabase
-    .from("orders")
-    .insert({ table_id: tableId, total_amount: totalAmount, note: note || null })
-    .select()
-    .single();
-
-  if (orderError || !order) {
-    console.error("createOrder failed:", orderError?.message);
-    throw new Error(orderError?.message ?? "Không thể tạo order.");
+  if (error || !orderId) {
+    console.error("createOrder failed:", error?.message);
+    throw new Error(error?.message ?? "Không thể tạo order.");
   }
 
-  const orderItems = lines.map((line) => ({
-    order_id: order.id,
-    menu_item_id: line.menuItemId,
-    item_name: line.name,
-    price: line.price,
-    quantity: line.quantity,
-    note: line.note || null,
-  }));
-
-  const { error: itemsError } = await supabase.from("order_items").insert(orderItems);
-
-  if (itemsError) {
-    console.error("createOrder items failed:", itemsError.message);
-    throw new Error(itemsError.message);
-  }
-
-  return order.id as string;
+  return orderId as string;
 }
 
 interface OrderRowWithTable extends OrderRow {
