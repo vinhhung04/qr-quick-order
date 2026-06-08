@@ -29,6 +29,11 @@ export function formatRelativeTime(isoDate: string): string {
   });
 }
 
+/** Display name for a table: its custom `label` if set, else "Bàn {number}". */
+export function getTableLabel(table: { table_number: number; label: string | null }): string {
+  return table.label?.trim() || `Bàn ${String(table.table_number).padStart(2, "0")}`;
+}
+
 /** Generates a short, URL-friendly random token, e.g. for new table QR codes. */
 export function generateToken(prefix = "ban"): string {
   const random = Math.random().toString(36).slice(2, 8);

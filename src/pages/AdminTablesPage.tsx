@@ -12,6 +12,7 @@ export default function AdminTablesPage() {
   const [tables, setTables] = useState<TableRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [tableNumber, setTableNumber] = useState("");
+  const [tableLabel, setTableLabel] = useState("");
   const [creating, setCreating] = useState(false);
 
   async function reload() {
@@ -49,9 +50,11 @@ export default function AdminTablesPage() {
 
     setCreating(true);
     try {
-      await createTable(number, generateToken("ban"));
-      toast.success(`Đã tạo Bàn ${String(number).padStart(2, "0")}`);
+      const label = tableLabel.trim();
+      await createTable(number, generateToken("ban"), label || null);
+      toast.success(`Đã tạo ${label || `Bàn ${String(number).padStart(2, "0")}`}`);
       setTableNumber("");
+      setTableLabel("");
       await reload();
     } catch {
       toast.error("Không thể tạo bàn mới.");
@@ -89,8 +92,14 @@ export default function AdminTablesPage() {
             min={1}
             value={tableNumber}
             onChange={(e) => setTableNumber(e.target.value)}
-            placeholder="Ví dụ: 7"
-            className="h-10 w-32 rounded-xl border border-stone-200 bg-stone-50 px-3 text-sm outline-none focus:border-brand-300 focus:ring-2 focus:ring-brand-100"
+            placeholder="Ví dụ: 14"
+            className="h-10 w-28 rounded-xl border border-stone-200 bg-stone-50 px-3 text-sm outline-none focus:border-brand-300 focus:ring-2 focus:ring-brand-100"
+          />
+          <input
+            value={tableLabel}
+            onChange={(e) => setTableLabel(e.target.value)}
+            placeholder="Tên hiển thị (tuỳ chọn) — vd. Phòng lạnh 1"
+            className="h-10 min-w-56 flex-1 rounded-xl border border-stone-200 bg-stone-50 px-3 text-sm outline-none focus:border-brand-300 focus:ring-2 focus:ring-brand-100"
           />
           <Button type="submit" size="md" disabled={creating}>
             {creating ? "Đang tạo..." : "+ Tạo bàn"}

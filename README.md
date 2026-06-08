@@ -32,7 +32,7 @@ src/
   types/        database, menu, order
 supabase/
   schema.sql    SQL schema + RLS + realtime publication
-  seed.sql      dữ liệu mẫu (4 danh mục, 16 món, 6 bàn)
+  seed.sql      dữ liệu mẫu — menu nhà hàng "Vườn Dừa" (6 danh mục, 31 món, 17 bàn)
 ```
 
 ## 🚀 Chạy local
@@ -48,18 +48,32 @@ supabase/
 2. Copy toàn bộ nội dung [`supabase/schema.sql`](supabase/schema.sql), dán vào
    và bấm **Run**.
 3. Copy toàn bộ nội dung [`supabase/seed.sql`](supabase/seed.sql), dán vào và
-   **Run** để tạo dữ liệu mẫu (4 danh mục, 16 món ăn/đồ uống, 6 bàn với
-   `qr_token` lần lượt là `ban-01` … `ban-06`).
+   **Run** để tạo dữ liệu mẫu — menu nhà hàng "Vườn Dừa" (6 danh mục, 31 món
+   ăn/đồ uống) cùng 17 bàn: `ban-01` … `ban-13` (đánh số) và 4 khu vực có tên
+   riêng — `phong-lanh-1`, `phong-lanh-2`, `choi-san`, `nha-go` (Phòng lạnh 1,
+   Phòng lạnh 2, Chòi sàn, Nhà gỗ).
 
-### 3. Bật Realtime cho bảng `orders`
+### 3. Bật Realtime cho bảng `orders`, `order_items`, `table_requests`
 
 `schema.sql` đã tự động chạy
-`alter publication supabase_realtime add table orders, order_items;`. Nếu vì
-lý do nào đó nó báo lỗi (ví dụ bảng đã có sẵn trong publication), bạn có thể
-bật thủ công tại **Database → Replication**: tìm bảng `orders` (và
-`order_items`) rồi bật toggle Realtime cho chúng.
+`alter publication supabase_realtime add table orders, order_items, table_requests;`.
+Nếu vì lý do nào đó nó báo lỗi (ví dụ bảng đã có sẵn trong publication), bạn có
+thể bật thủ công tại **Database → Replication**: tìm các bảng `orders`,
+`order_items`, `table_requests` rồi bật toggle Realtime cho chúng.
 
-### 4. Cấu hình biến môi trường
+### 4. Tạo Storage bucket cho ảnh món ăn
+
+Trang `/admin/menu` cho phép tải ảnh món ăn trực tiếp từ máy lên **Supabase
+Storage** (bucket `menu-images`, public read). Bucket cùng các policy RLS cần
+thiết đã được tạo sẵn khi bạn chạy `schema.sql` ở bước 2 (lệnh `insert into
+storage.buckets ...` cùng các policy `for select/insert/update/delete to anon`
+trên `storage.objects`).
+
+Nếu muốn kiểm tra hoặc tạo thủ công, vào **Storage** trong Supabase Dashboard,
+xác nhận đã có bucket tên `menu-images` với **Public bucket** bật, và trong
+**Policies** có các rule cho phép `anon` đọc/ghi vào bucket này.
+
+### 5. Cấu hình biến môi trường
 
 ```bash
 cp .env.example .env.local
@@ -72,7 +86,7 @@ VITE_SUPABASE_URL=https://your-project-ref.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-public-key
 ```
 
-### 5. Cài đặt & chạy
+### 6. Cài đặt & chạy
 
 ```bash
 npm install
@@ -81,7 +95,8 @@ npm run dev
 
 Mở trình duyệt:
 
-- Trang khách: `http://localhost:5173/order/ban-01` (hoặc `ban-02` … `ban-06`)
+- Trang khách: `http://localhost:5173/order/ban-01` (hoặc `ban-02` … `ban-13`,
+  `phong-lanh-1`, `phong-lanh-2`, `choi-san`, `nha-go`)
 - Màn hình nhân viên: `http://localhost:5173/staff/orders`
 - Quản lý menu: `http://localhost:5173/admin/menu`
 - Quản lý bàn & QR: `http://localhost:5173/admin/tables`
@@ -113,11 +128,12 @@ các route phía client (React Router) hoạt động đúng khi reload trang.
 
 | Bảng | Mục đích |
 | --- | --- |
-| `tables` | Bàn ăn — số bàn, `qr_token` riêng, trạng thái hoạt động |
+| `tables` | Bàn ăn — số bàn, `qr_token` riêng, trạng thái hoạt động, tên hiển thị tuỳ chọn (`label`, vd. "Phòng lạnh 1") |
 | `categories` | Danh mục món ăn — tên, thứ tự hiển thị |
 | `menu_items` | Món ăn/đồ uống — tên, mô tả, giá, ảnh, còn hàng/bán chạy/mới |
 | `orders` | Đơn hàng — bàn nào đặt, tổng tiền, ghi chú chung |
 | `order_items` | Chi tiết đơn — **lưu lại `item_name`/`price` tại thời điểm đặt** để lịch sử order không bị thay đổi khi admin sửa menu sau này |
+| `table_requests` | Yêu cầu nhanh từ khách — gọi nhân viên / yêu cầu thanh toán, hiển thị realtime ở `/staff/orders` |
 
 Chi tiết đầy đủ (kiểu dữ liệu, khóa ngoại, RLS policies) xem trong
 [`supabase/schema.sql`](supabase/schema.sql).

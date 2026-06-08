@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import type { TableRow } from "../../types/database";
-import { cn } from "../../lib/utils";
+import { cn, getTableLabel } from "../../lib/utils";
 
 interface QRTableCardProps {
   table: TableRow;
@@ -30,7 +30,7 @@ export function QRTableCard({ table, onToggleActive }: QRTableCardProps) {
       )}
     >
       <span className="rounded-2xl bg-stone-900 px-4 py-2 text-base font-extrabold text-white">
-        Bàn {String(table.table_number).padStart(2, "0")}
+        {getTableLabel(table)}
       </span>
 
       <div className="rounded-2xl bg-white p-3 ring-1 ring-stone-100">

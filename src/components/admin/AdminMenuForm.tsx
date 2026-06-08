@@ -1,8 +1,10 @@
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { Category, MenuItem } from "../../types/menu";
 import type { MenuItemInput } from "../../services/menuService";
+import { uploadMenuImage } from "../../services/storageService";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
+import { Spinner } from "../ui/Spinner";
 import { cn } from "../../lib/utils";
 
 const inputClass =
@@ -43,9 +45,55 @@ export function AdminMenuForm({ open, categories, initial, onClose, onSubmit }: 
       : { ...emptyForm, category_id: categories[0]?.id ?? "" }
   );
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(initial?.image_url ?? null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const objectUrlRef = useRef<string | null>(null);
+
+  // Revoke any locally-created object URL when the form unmounts.
+  useEffect(() => {
+    return () => {
+      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+    };
+  }, []);
 
   if (!open) return null;
+
+  function setLocalPreview(url: string | null) {
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = null;
+    }
+    if (url) objectUrlRef.current = url;
+    setPreviewUrl(url);
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setError("Vui lòng chọn một tệp hình ảnh hợp lệ.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Ảnh quá lớn, vui lòng chọn ảnh dưới 5MB.");
+      return;
+    }
+
+    setError(null);
+    setImageFile(file);
+    setLocalPreview(URL.createObjectURL(file));
+  }
+
+  function handleRemoveImage() {
+    setImageFile(null);
+    setLocalPreview(null);
+    setForm((f) => ({ ...f, image_url: "" }));
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -56,7 +104,18 @@ export function AdminMenuForm({ open, categories, initial, onClose, onSubmit }: 
     setError(null);
     setSaving(true);
     try {
-      await onSubmit(form);
+      let imageUrl = form.image_url;
+
+      if (imageFile) {
+        setUploading(true);
+        try {
+          imageUrl = await uploadMenuImage(imageFile);
+        } finally {
+          setUploading(false);
+        }
+      }
+
+      await onSubmit({ ...form, image_url: imageUrl });
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Có lỗi xảy ra, vui lòng thử lại.");
@@ -120,13 +179,39 @@ export function AdminMenuForm({ open, categories, initial, onClose, onSubmit }: 
             />
           </Field>
 
-          <Field label="URL hình ảnh">
-            <input
-              value={form.image_url}
-              onChange={(e) => setForm((f) => ({ ...f, image_url: e.target.value }))}
-              className={inputClass}
-              placeholder="https://images.unsplash.com/..."
-            />
+          <Field label="Hình ảnh món ăn">
+            <div className="flex items-center gap-3">
+              <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-stone-100 ring-1 ring-stone-200">
+                {previewUrl ? (
+                  <img src={previewUrl} alt="Xem trước" className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-2xl">🍽️</div>
+                )}
+                {uploading && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-white/70">
+                    <Spinner className="h-5 w-5 text-brand-500" />
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-1 flex-col gap-1.5">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="text-xs text-stone-500 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-50 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-brand-700 hover:file:bg-brand-100"
+                />
+                {previewUrl && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveImage}
+                    className="self-start text-xs font-semibold text-stone-400 transition hover:text-red-500"
+                  >
+                    Xóa ảnh
+                  </button>
+                )}
+              </div>
+            </div>
           </Field>
 
           <div className="flex flex-wrap gap-4 pt-1">

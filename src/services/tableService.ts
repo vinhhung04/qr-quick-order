@@ -31,10 +31,14 @@ export async function getAllTables(): Promise<TableRow[]> {
   return data ?? [];
 }
 
-export async function createTable(tableNumber: number, qrToken: string): Promise<TableRow | null> {
+export async function createTable(
+  tableNumber: number,
+  qrToken: string,
+  label?: string | null
+): Promise<TableRow | null> {
   const { data, error } = await supabase
     .from("tables")
-    .insert({ table_number: tableNumber, qr_token: qrToken, is_active: true })
+    .insert({ table_number: tableNumber, qr_token: qrToken, label: label || null, is_active: true })
     .select()
     .single();
 

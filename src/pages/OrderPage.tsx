@@ -6,16 +6,19 @@ import { useCart } from "../context/useCart";
 import { getMenu } from "../services/menuService";
 import { getTableByToken } from "../services/tableService";
 import { createOrder } from "../services/orderService";
+import { createTableRequest, type TableRequestType } from "../services/requestService";
 import type { TableRow } from "../types/database";
 import type { MenuItem, MenuSection } from "../types/menu";
 import { MenuCard } from "../components/menu/MenuCard";
 import { CategoryFilter } from "../components/menu/CategoryFilter";
 import { SearchBar } from "../components/menu/SearchBar";
+import { RequestButtons } from "../components/order/RequestButtons";
 import { FloatingCartButton } from "../components/cart/FloatingCartButton";
 import { CartDrawer } from "../components/cart/CartDrawer";
 import { OrderSuccessModal } from "../components/cart/OrderSuccessModal";
 import { EmptyState } from "../components/ui/EmptyState";
 import { PageSpinner } from "../components/ui/Spinner";
+import { getTableLabel } from "../lib/utils";
 
 type LoadState = "loading" | "ready" | "not-found" | "error";
 
@@ -40,6 +43,7 @@ function OrderPageContent({ qrToken }: { qrToken: string }) {
   const [cartOpen, setCartOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
+  const [pendingRequests, setPendingRequests] = useState<Set<TableRequestType>>(() => new Set());
 
   const cart = useCart();
 
@@ -92,6 +96,34 @@ function OrderPageContent({ qrToken }: { qrToken: string }) {
     toast.success(`Đã thêm "${item.name}" vào giỏ`, {
       icon: "🛒",
     });
+  }
+
+  async function handleRequest(type: TableRequestType) {
+    if (!table || pendingRequests.has(type)) return;
+
+    setPendingRequests((prev) => new Set(prev).add(type));
+    try {
+      await createTableRequest(table.id, type);
+      toast.success(
+        type === "call_staff" ? "Đã gửi yêu cầu gọi nhân viên 🔔" : "Đã gửi yêu cầu thanh toán 🧾",
+        { icon: "✅" }
+      );
+      window.setTimeout(() => {
+        setPendingRequests((prev) => {
+          const next = new Set(prev);
+          next.delete(type);
+          return next;
+        });
+      }, 90_000);
+    } catch (err) {
+      console.error(err);
+      toast.error("Không thể gửi yêu cầu, vui lòng thử lại.");
+      setPendingRequests((prev) => {
+        const next = new Set(prev);
+        next.delete(type);
+        return next;
+      });
+    }
   }
 
   async function handleSubmitOrder() {
@@ -157,9 +189,13 @@ function OrderPageContent({ qrToken }: { qrToken: string }) {
             🍽️ QR Quick Order
           </span>
           <h1 className="mt-3 text-2xl font-extrabold leading-tight sm:text-3xl">
-            Xin chào, Bàn {String(table?.table_number).padStart(2, "0")}
+            Xin chào, {table ? getTableLabel(table) : ""}
           </h1>
           <p className="mt-1 text-sm text-white/85">Chọn món yêu thích của bạn 🧡</p>
+
+          <div className="mt-4">
+            <RequestButtons pending={pendingRequests} onRequest={handleRequest} />
+          </div>
         </div>
       </header>
 

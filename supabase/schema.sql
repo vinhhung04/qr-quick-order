@@ -26,8 +26,13 @@ create table if not exists public.tables (
   table_number integer not null unique,
   qr_token text not null unique,
   is_active boolean not null default true,
+  -- Optional custom display name for non-numbered areas (e.g. "Phòng lạnh 1",
+  -- "Chòi sàn"). When null, the UI falls back to "Bàn {table_number}".
+  label text,
   created_at timestamptz not null default now()
 );
+
+alter table public.tables add column if not exists label text;
 
 -- ----------------------------------------------------------------------------
 -- categories: menu groupings (Món chính, Đồ uống, ...)
@@ -89,6 +94,21 @@ create table if not exists public.order_items (
 
 create index if not exists order_items_order_id_idx on public.order_items (order_id);
 
+-- ----------------------------------------------------------------------------
+-- table_requests: lightweight call-staff / request-bill notifications sent
+-- from the customer ordering page and shown live on /staff/orders.
+-- ----------------------------------------------------------------------------
+create table if not exists public.table_requests (
+  id uuid primary key default gen_random_uuid(),
+  table_id uuid not null references public.tables (id) on delete cascade,
+  type text not null check (type in ('call_staff', 'request_bill')),
+  status text not null default 'pending' check (status in ('pending', 'done')),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists table_requests_table_id_idx on public.table_requests (table_id);
+create index if not exists table_requests_status_idx on public.table_requests (status);
+
 -- ============================================================================
 -- Row Level Security
 -- MVP has no auth, so we allow the `anon` role to do everything. Tighten
@@ -99,6 +119,7 @@ alter table public.categories enable row level security;
 alter table public.menu_items enable row level security;
 alter table public.orders enable row level security;
 alter table public.order_items enable row level security;
+alter table public.table_requests enable row level security;
 
 drop policy if exists "anon full access" on public.tables;
 create policy "anon full access" on public.tables for all to anon using (true) with check (true);
@@ -115,11 +136,45 @@ create policy "anon full access" on public.orders for all to anon using (true) w
 drop policy if exists "anon full access" on public.order_items;
 create policy "anon full access" on public.order_items for all to anon using (true) with check (true);
 
+drop policy if exists "anon full access" on public.table_requests;
+create policy "anon full access" on public.table_requests for all to anon using (true) with check (true);
+
 -- ============================================================================
--- Realtime: add orders/order_items to the supabase_realtime publication so
--- the staff screen receives INSERT events without polling.
+-- Realtime: add orders/order_items/table_requests to the supabase_realtime
+-- publication so the staff screen receives INSERT events without polling.
 -- (If this errors saying the table is already a member, that's fine — it
 -- means Realtime is already enabled for it.)
 -- ============================================================================
 alter publication supabase_realtime add table public.orders;
 alter publication supabase_realtime add table public.order_items;
+alter publication supabase_realtime add table public.table_requests;
+
+-- ============================================================================
+-- Storage: public bucket for menu item images, uploaded from /admin/menu.
+-- Allows anyone (anon) to read and upload — fine for an MVP with no auth;
+-- tighten the insert/update/delete policies before going to production.
+-- ============================================================================
+insert into storage.buckets (id, name, public)
+values ('menu-images', 'menu-images', true)
+on conflict (id) do nothing;
+
+drop policy if exists "menu-images public read" on storage.objects;
+create policy "menu-images public read" on storage.objects
+  for select to anon
+  using (bucket_id = 'menu-images');
+
+drop policy if exists "menu-images anon upload" on storage.objects;
+create policy "menu-images anon upload" on storage.objects
+  for insert to anon
+  with check (bucket_id = 'menu-images');
+
+drop policy if exists "menu-images anon manage" on storage.objects;
+create policy "menu-images anon manage" on storage.objects
+  for update to anon
+  using (bucket_id = 'menu-images')
+  with check (bucket_id = 'menu-images');
+
+drop policy if exists "menu-images anon delete" on storage.objects;
+create policy "menu-images anon delete" on storage.objects
+  for delete to anon
+  using (bucket_id = 'menu-images');

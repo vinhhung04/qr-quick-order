@@ -51,13 +51,13 @@ export async function createOrder({ tableId, note, lines }: CreateOrderInput): P
 }
 
 interface OrderRowWithTable extends OrderRow {
-  tables: { table_number: number } | null;
+  tables: { table_number: number; label: string | null } | null;
 }
 
 export async function getRecentOrders(limit = 30): Promise<OrderWithItems[]> {
   const { data: orders, error: ordersError } = await supabase
     .from("orders")
-    .select("*, tables ( table_number )")
+    .select("*, tables ( table_number, label )")
     .order("created_at", { ascending: false })
     .limit(limit);
 
@@ -84,6 +84,7 @@ export async function getRecentOrders(limit = 30): Promise<OrderWithItems[]> {
   return safeOrders.map((order) => ({
     ...order,
     table_number: order.tables?.table_number ?? 0,
+    table_label: order.tables?.label ?? null,
     items: safeItems.filter((item) => item.order_id === order.id),
   }));
 }
@@ -91,7 +92,7 @@ export async function getRecentOrders(limit = 30): Promise<OrderWithItems[]> {
 export async function getOrderWithItems(orderId: string): Promise<OrderWithItems | null> {
   const { data: order, error: orderError } = await supabase
     .from("orders")
-    .select("*, tables ( table_number )")
+    .select("*, tables ( table_number, label )")
     .eq("id", orderId)
     .maybeSingle();
 
@@ -114,6 +115,7 @@ export async function getOrderWithItems(orderId: string): Promise<OrderWithItems
   return {
     ...typedOrder,
     table_number: typedOrder.tables?.table_number ?? 0,
+    table_label: typedOrder.tables?.label ?? null,
     items: (items ?? []) as OrderItemRow[],
   };
 }

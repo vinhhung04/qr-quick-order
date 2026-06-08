@@ -1,5 +1,5 @@
 import type { OrderWithItems } from "../../types/order";
-import { formatRelativeTime, formatVND, cn } from "../../lib/utils";
+import { formatRelativeTime, formatVND, getTableLabel, cn } from "../../lib/utils";
 
 interface StaffOrderCardProps {
   order: OrderWithItems;
@@ -16,7 +16,7 @@ export function StaffOrderCard({ order, highlight }: StaffOrderCardProps) {
     >
       <div className="flex items-center justify-between">
         <span className="inline-flex items-center gap-2 rounded-2xl bg-stone-900 px-3.5 py-2 text-sm font-extrabold text-white">
-          🍽️ Bàn {String(order.table_number).padStart(2, "0")}
+          🍽️ {getTableLabel({ table_number: order.table_number, label: order.table_label })}
         </span>
         <span className="text-xs font-medium text-stone-400">{formatRelativeTime(order.created_at)}</span>
       </div>

@@ -3,6 +3,16 @@ export interface TableRow {
   table_number: number;
   qr_token: string;
   is_active: boolean;
+  /** Optional custom display name (e.g. "Phòng lạnh 1", "Chòi sàn"). */
+  label: string | null;
+  created_at: string;
+}
+
+export interface TableRequestRow {
+  id: string;
+  table_id: string;
+  type: "call_staff" | "request_bill";
+  status: "pending" | "done";
   created_at: string;
 }
 
